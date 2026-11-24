@@ -1,5 +1,23 @@
 # 更新日志
 
+## v3.53（Release v55，2026-11-24）
+
+- 修复国际版等级任务真实对话：任务会话改走 `/console/webchat/conversations`，不再把每日活跃使用的 `/console/as/conversations/` 会话 ID 直接交给 `/console/chat/completions`。
+- 对齐国际版网页对话请求头：根路径 Referer、`X-Requested-With`、`X-CodeBuddy-Request`、`X-Product` 与英文语言头。
+- `/console/chat/completions` 非 200 时带出脱敏后的服务端 `code / msg / text[:200]`，不再只显示 HTTP 400。
+- 修复 `template_used` 场景表：改用公开的 `/v2/as/support/scenes?locale=en`；旧 `en-US` 返回空列表，导致稳定报“场景表未返回可用模板”。
+- 主脚本积分查询新增 `get-user-resource` 到期明细：月度套餐显示月底清零，活动赠送积分显示逐笔到期时间；结果同步到账号日志和推送摘要。
+- 新增任务会话路径、400 响应体透出、英文场景表、积分到期解析与查询集成回归；任务完成仍以服务端状态回读为准。
+
+## v3.52（Release v54，2026-11-23）
+
+- 国际版 `workbuddy_intl_daily.py` 新增 5 项等级任务适配：`first_chat`、`skill_installed`、`wechat_linked`、`expert_summoned`、`template_used`。
+- 任务列表同时读取 `/activity/growth/tasks` 与 `/v2/activity/growth/tasks`，兼容等级族的 `code/status` 和成长族的 `task_code/accept_status` 两套字段。
+- `first_chat`、`expert_summoned`、`template_used`、`skill_installed` 均先执行真实网页会话或技能安装，再上报对应判据；只有服务端回读 `completed` 或 `claimed` 才进入领奖，HTTP 200 或事件上报成功不算完成。
+- `wechat_linked` 只检测任务状态并提示在官方客户端绑定微信，不发送伪造事件、不领奖。
+- 新增 `--no-tasks`，可在只跑每日活跃时跳过国际版等级任务；`--report-only` 继续保证零任务写操作。
+- 补齐三源任务合并、真实 SSE 会话/消息 ID、等级与桌面分头、技能安装回读、事件信封、未完成不领奖和已领奖回读测试；全套 `224` 项测试通过。
+
 ## 登录工具 v2.1（Release v53，2026-11-19）
 
 - 登录成功后先校验 AT/RT 的 JWT 三段结构、`typ` 与国内 WorkBuddy 签发域；RT 不是合法 JWT 时拒绝生成 `手机号:AT:RT` 行，也不写入 `wb_login_result.json`。
