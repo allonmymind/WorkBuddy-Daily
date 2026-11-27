@@ -1,5 +1,34 @@
 # 更新日志
 
+## v59（2026-11-26）
+
+- 修复 Issue #66：国际版 workflow 现在显式传递 `PLUSPLUS_TOKEN`，同时保留 `PUSHPLUS_TOKEN` 兼容路径。
+- 国际版 `notify()` 优先读取 `PLUSPLUS_TOKEN`，为空时回落 `PUSHPLUS_TOKEN`，不再因为变量名不同而静默跳过 PushPlus。
+- 新增 PushPlus 环境变量别名回归；脚本版本保持 `v3.55`，业务逻辑未变更。
+
+## v58（文档修订，2026-11-24）
+
+- 统一中文主 README 与英、繁中、日、韩、葡六语文档的国际版任务口径：默认只读核对，只有 `--experimental-intl-tasks` 才尝试执行 `first_chat / skill_installed / expert_summoned / template_used`。
+- 明确事件被服务端接收不等于任务完成或积分结算，避免文档把实验能力描述成默认可自动完成。
+- 脚本版本保持 `v3.55`，业务逻辑未变更。
+
+## v3.55（Release v57，2026-11-24）
+
+- 修复 Issue #64：国际版官方 provider 明确 `growth:false`、`tasks.list=[]`、`tasks.run=501`，不存在等级任务结算协议；不再把国内成长中心事件硬套到国际版。
+- 国际版等级任务默认只读：服务端已 `completed/claimed` 时仍可领奖，`available` 状态只报告上游未开放自动任务事件，不再执行伪动作或打印“动作已成功”。
+- 保留 `--experimental-intl-tasks` 仅用于抓包/回归实验，并在帮助与文档中明确事件成功不等于任务完成或积分到账。
+- `report_growth_events()` 只接受明确的 `code=0`，不再把 HTTP 200 + `code=None` 当作任务事件成功。
+- 新增国际版积分前后回读：调用 `get-user-resource-summary` 汇总 `CycleRemainCapacity`，报告操作前后余额与差值；积分不变时明确显示“本轮无变化”。
+- `claim_daily()` 解析 `data.credit` 与 `credit_delayed`；活动关闭时不再声称“积分由上游异步发放”，只报告活跃链路已更新、积分未确认。
+- 新增只读任务、明确事件码、积分汇总、延迟入账与活动关闭文案回归；全套 `233` 项测试通过。
+
+## v3.54（Release v56，2026-11-24）
+
+- 修复 Issue #63：国际版等级任务的 `/console/chat/completions` 请求缺少首条 system message，服务端返回 `HTTP 400 / code=11-128 / first message is not system prompt`。
+- `web_task_conversation_session()` 与 `keepalive()` 现在共用 `SYSTEM_PROMPT`，任务请求固定为 `system → user` 两段消息。
+- 新增网页任务消息结构回归，防止后续只发送 user message 导致四项等级任务再次全灭。
+- 任务完成仍以服务端 `completed / claimed` 回读为准，不以 HTTP 200 或事件上报冒充成功。
+
 ## v3.53（Release v55，2026-11-24）
 
 - 修复国际版等级任务真实对话：任务会话改走 `/console/webchat/conversations`，不再把每日活跃使用的 `/console/as/conversations/` 会话 ID 直接交给 `/console/chat/completions`。

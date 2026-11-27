@@ -20,7 +20,7 @@
 
 - `workbuddy_daily.py`：國內版每日任務、小程式任務、互動玩法與報告。
 - `workbuddy_login.py`：簡訊登入並輸出 `手機號:AT:RT`。
-- `workbuddy_intl_daily.py`：國際版每日活躍、保活與 5 項等級任務。
+- `workbuddy_intl_daily.py`：國際版每日活躍、保活與唯讀等級任務狀態。
 - `workbuddy_intl_login.py`：國際版裝置授權登入。
 - `credits_report.py`：可選的積分與到期報告。
 
@@ -64,7 +64,8 @@ python workbuddy_intl_daily.py
 ```
 
 國內版與國際版登入態不通用，請勿混用 Token。
-腳本會執行 `first_chat`、`skill_installed`、`expert_summoned`、`template_used` 並回讀服務端狀態；`wechat_linked` 只偵測，必須在官方客戶端綁定微信。可用 `--no-tasks` 跳過這 5 項。
+國際版等級任務預設唯讀；官方 provider 標記 `growth` 不支援，腳本不會偽造完成事件。
+腳本預設只讀取並核對這 5 項任務；`wechat_linked` 必須在官方客戶端綁定微信。`--experimental-intl-tasks` 才會嘗試執行 `first_chat`、`skill_installed`、`expert_summoned`、`template_used` 並回讀，事件被接收不代表已結算。可用 `--no-tasks` 跳過這 5 項。
 
 ## 常用變數
 
@@ -75,7 +76,7 @@ python workbuddy_intl_daily.py
 | `WORKBUDDY_TASKS` | 可選任務白名單 |
 | `WORKBUDDY_SKIP_TASKS` | 可選任務黑名單 |
 | `WORKBUDDY_STATE_DIR` | 持久化 Token 輪換狀態的目錄 |
-| `PUSHPLUS_TOKEN`、`BARK_URL`、`WXPUSHER_APP_TOKEN`、`WECOM_WEBHOOK`、`DINGTALK_WEBHOOK` | 可選推送渠道 |
+| `PUSHPLUS_TOKEN` / `PLUSPLUS_TOKEN`、`BARK_URL`、`WXPUSHER_APP_TOKEN`、`WECOM_WEBHOOK`、`DINGTALK_WEBHOOK` | 可選推送渠道 |
 
 ## 安全提醒
 

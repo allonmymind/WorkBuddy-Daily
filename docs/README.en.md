@@ -20,7 +20,7 @@
 
 - `workbuddy_daily.py`: WorkBuddy CN daily tasks, mini-program tasks, games, and reporting.
 - `workbuddy_login.py`: SMS login helper that outputs a ready-to-use `phone:AT:RT` credential.
-- `workbuddy_intl_daily.py`: WorkBuddy International daily activity, keepalive, and five level tasks.
+- `workbuddy_intl_daily.py`: WorkBuddy International daily activity, keepalive, and read-only level-task status.
 - `workbuddy_intl_login.py`: device authorization helper for WorkBuddy International accounts.
 - `credits_report.py`: optional credit balance and expiry report.
 
@@ -64,7 +64,8 @@ python workbuddy_intl_daily.py
 ```
 
 Use `WORKBUDDY_INTL_TOKENS` for multiple accounts. Tokens are not interchangeable between CN and International domains.
-The script executes `first_chat`, `skill_installed`, `expert_summoned`, and `template_used` with server-side readback. `wechat_linked` is detected but must be completed in the official client. Use `--no-tasks` to skip these five tasks.
+International level tasks are read-only by default: the official provider marks `growth` as unsupported, so the script does not invent completion events.
+By default, the script only reads and verifies these five tasks. `wechat_linked` must be completed in the official client. `--experimental-intl-tasks` may attempt `first_chat`, `skill_installed`, `expert_summoned`, and `template_used` for capture or regression testing, but event acceptance does not imply settlement. Use `--no-tasks` to skip all five tasks.
 
 ## Common variables
 
@@ -75,7 +76,7 @@ The script executes `first_chat`, `skill_installed`, `expert_summoned`, and `tem
 | `WORKBUDDY_TASKS` | Optional task allowlist |
 | `WORKBUDDY_SKIP_TASKS` | Optional task denylist |
 | `WORKBUDDY_STATE_DIR` | Persistent state directory for rotated tokens |
-| `PUSHPLUS_TOKEN`, `BARK_URL`, `WXPUSHER_APP_TOKEN`, `WECOM_WEBHOOK`, `DINGTALK_WEBHOOK` | Optional notification channels |
+| `PUSHPLUS_TOKEN` / `PLUSPLUS_TOKEN`, `BARK_URL`, `WXPUSHER_APP_TOKEN`, `WECOM_WEBHOOK`, `DINGTALK_WEBHOOK` | Optional notification channels |
 
 ## Security
 

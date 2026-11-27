@@ -1,7 +1,9 @@
 import importlib.util
 import io
+import os
 import unittest
 from contextlib import redirect_stdout
+from pathlib import Path
 from unittest import mock
 from pathlib import Path
 
@@ -79,6 +81,37 @@ class InternationalBehaviorTests(unittest.TestCase):
             MODULE.requests.Session = old_session
             MODULE.model_chain = old_chain
 
+    def test_pushplus_accepts_pushplus_token_alias(self):
+        with mock.patch.dict(os.environ, {
+                "PUSHPLUS_TOKEN": "legacy-pushplus",
+                "PLUSPLUS_TOKEN": "",
+        }, clear=True), mock.patch.object(MODULE.requests, "post") as post:
+            MODULE.notify("report")
+
+        post.assert_called_once()
+        self.assertIn("pushplus.plus", post.call_args.args[0])
+        self.assertTrue(post.call_args.args[0].startswith("https://"))
+        self.assertEqual(
+            "legacy-pushplus", post.call_args.kwargs["json"]["token"])
+
+    def test_pushplus_prefers_plusplus_token(self):
+        with mock.patch.dict(os.environ, {
+                "PUSHPLUS_TOKEN": "legacy-pushplus",
+                "PLUSPLUS_TOKEN": "primary-pushplus",
+        }, clear=True), mock.patch.object(MODULE.requests, "post") as post:
+            MODULE.notify("report")
+
+        post.assert_called_once()
+        self.assertEqual(
+            "primary-pushplus", post.call_args.kwargs["json"]["token"])
+
+    def test_intl_workflow_injects_both_pushplus_names(self):
+        workflow = (Path(__file__).resolve().parents[1]
+                    / ".github/workflows/workbuddy.yml").read_text(encoding="utf-8")
+        intl_step = workflow.split("- name: Run WorkBuddy Intl", 1)[1]
+        self.assertIn("PLUSPLUS_TOKEN:", intl_step)
+        self.assertIn("PUSHPLUS_TOKEN:", intl_step)
+
     def test_preflight_stops_on_11140_before_refresh_or_writes(self):
         MODULE.post_json = lambda *args, **kwargs: Response(
             403, {"code": 11140, "msg": "request illegal"})
@@ -140,7 +173,7 @@ class InternationalBehaviorTests(unittest.TestCase):
                 mock.patch.object(MODULE, "perform_growth_task_action") as action, \
                 mock.patch.object(MODULE, "claim_growth_task") as claim, \
                 redirect_stdout(output):
-            result = MODULE.run_growth_tasks("token", "uid")
+            result = MODULE.run_growth_tasks("token", "uid", experimental=True)
 
         self.assertEqual([("wechat_linked", "需客户端绑定微信")], result)
         action.assert_not_called()
@@ -153,7 +186,7 @@ class InternationalBehaviorTests(unittest.TestCase):
         with mock.patch.object(MODULE, "fetch_growth_tasks", return_value=(rows, [])), \
                 mock.patch.object(MODULE, "claim_growth_task") as claim, \
                 redirect_stdout(output):
-            result = MODULE.run_growth_tasks("token", "uid")
+            result = MODULE.run_growth_tasks("token", "uid", experimental=True)
 
         claim.assert_not_called()
         self.assertEqual([("wechat_linked", "服务端已达标，需官方客户端确认绑定")], result)
@@ -249,11 +282,78 @@ class InternationalBehaviorTests(unittest.TestCase):
                 mock.patch.object(MODULE, "_wait_growth_task", return_value=unchanged), \
                 mock.patch.object(MODULE, "claim_growth_task") as claim, \
                 redirect_stdout(output):
-            result = MODULE.run_growth_tasks("token", "uid")
+            result = MODULE.run_growth_tasks("token", "uid", experimental=True)
 
         claim.assert_not_called()
         self.assertIn("状态未变", result[0][1])
         self.assertIn("不冒领", output.getvalue())
+
+    def test_international_growth_tasks_are_read_only_by_default(self):
+        output = io.StringIO()
+        rows = {"first_chat": {"code": "first_chat", "status": "available"}}
+        with mock.patch.object(MODULE, "fetch_growth_tasks", return_value=(rows, [])), \
+                mock.patch.object(MODULE, "perform_growth_task_action") as action, \
+                mock.patch.object(MODULE, "claim_growth_task") as claim, \
+                redirect_stdout(output):
+            result = MODULE.run_growth_tasks("token", "uid")
+
+        action.assert_not_called()
+        claim.assert_not_called()
+        self.assertIn("只读", result[0][1])
+        self.assertIn("未开放自动任务事件", output.getvalue())
+
+    def test_report_growth_events_requires_explicit_zero_code(self):
+        class FakeSession:
+            def __init__(self):
+                self.trust_env = True
+
+            def post(self, *args, **kwargs):
+                return Response(200, {})
+
+        with mock.patch.object(MODULE.requests, "Session", FakeSession):
+            ok, note = MODULE.report_growth_events(
+                "token", "uid", [{"eventCode": "first_chat"}])
+
+        self.assertFalse(ok)
+        self.assertIn("code=None", note)
+
+    def test_credit_total_sums_precise_and_legacy_fields(self):
+        class FakeSession:
+            def __init__(self):
+                self.trust_env = True
+
+            def post(self, *args, **kwargs):
+                return Response(200, {
+                    "code": 0,
+                    "data": {"Packages": [
+                        {"CycleRemainCapacity": 10},
+                        {"CycleRemainCapacityPrecise": "2.5"},
+                    ]},
+                })
+
+        with mock.patch.object(MODULE.requests, "Session", FakeSession):
+            total, error = MODULE.query_credit_total("token", "uid")
+
+        self.assertEqual(12.5, total)
+        self.assertEqual("", error)
+
+    def test_inactive_activity_does_not_promise_credits(self):
+        text = MODULE.day_completed_note(
+            "活动已关闭", True, False, False, False, True, True)
+
+        self.assertIn("积分未确认", text)
+        self.assertNotIn("异步发放", text)
+
+    def test_claim_daily_marks_delayed_credit_without_claiming_arrival(self):
+        response = Response(200, {
+            "code": 0,
+            "data": {"credit": 30, "credit_delayed": True},
+        })
+        with mock.patch.object(MODULE, "post_json", return_value=response):
+            ok, note = MODULE.claim_daily("token", "uid")
+
+        self.assertTrue(ok)
+        self.assertIn("待入账", note)
 
     def test_completed_task_is_claimed_only_after_readback(self):
         output = io.StringIO()
@@ -266,7 +366,7 @@ class InternationalBehaviorTests(unittest.TestCase):
                 mock.patch.object(MODULE, "claim_growth_task",
                                   return_value=(True, "已领取（回读确认）")) as claim, \
                 redirect_stdout(output):
-            result = MODULE.run_growth_tasks("token", "uid")
+            result = MODULE.run_growth_tasks("token", "uid", experimental=True)
 
         claim.assert_called_once_with("token", "uid", "template_used")
         self.assertEqual([("template_used", "已领取（回读确认）")], result)
@@ -437,6 +537,13 @@ class InternationalBehaviorTests(unittest.TestCase):
         self.assertIn("WorkBuddy task-", session.post_calls[0][1]["json"]["name"])
         self.assertTrue(session.post_calls[1][0].endswith("/console/chat/completions"))
         self.assertEqual("conv-real", session.post_calls[1][1]["json"]["conversationId"])
+        self.assertEqual(
+            [
+                {"role": "system", "content": MODULE.SYSTEM_PROMPT},
+                {"role": "user", "content": "hello"},
+            ],
+            session.post_calls[1][1]["json"]["messages"],
+        )
         self.assertEqual("text/event-stream", session.post_calls[1][1]["headers"]["Accept"])
         self.assertEqual(MODULE.BASE + "/", session.post_calls[1][1]["headers"]["Referer"])
         self.assertEqual(
@@ -597,7 +704,7 @@ class InternationalBehaviorTests(unittest.TestCase):
                 mock.patch.object(MODULE, "perform_growth_task_action") as action, \
                 redirect_stdout(output):
             result = MODULE.run_growth_tasks(
-                "token", "uid", allow_web=False)
+                "token", "uid", allow_web=False, experimental=True)
 
         action.assert_not_called()
         self.assertEqual([("first_chat", "已跳过（--no-keepalive）")], result)
